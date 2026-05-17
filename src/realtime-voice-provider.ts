@@ -11,6 +11,9 @@ import type {
   RealtimeVoiceAudioFormat,
   RealtimeVoiceBridge,
   RealtimeVoiceBridgeCreateRequest,
+  RealtimeVoiceBrowserJsonPcmWebSocketSession,
+  RealtimeVoiceBrowserSession,
+  RealtimeVoiceBrowserSessionCreateRequest,
   RealtimeVoiceProviderConfig,
   RealtimeVoiceProviderConfiguredContext,
   RealtimeVoiceProviderPlugin,
@@ -19,6 +22,7 @@ import type {
 } from "./types.js";
 import { REALTIME_VOICE_AUDIO_FORMAT_PCM16_24KHZ } from "./types.js";
 import { forceRefreshXaiAuth, resolveXaiAuth } from "./xai-oauth.js";
+import { mintXaiEphemeralToken } from "./xai-ephemeral.js";
 
 const PLUGIN_ID = "openclaw-xai-speech";
 const DEFAULT_MODEL = "grok-voice-think-fast-1.0";
@@ -336,6 +340,53 @@ class XaiRealtimeVoiceBridge implements RealtimeVoiceBridge {
   }
 }
 
+async function createXaiBrowserSession(
+  req: RealtimeVoiceBrowserSessionCreateRequest,
+): Promise<RealtimeVoiceBrowserSession> {
+  const merged = mergeProviderConfig({ cfg: req.cfg, providerConfig: req.providerConfig });
+  const authProfileAgent = ((merged.authProfileAgent as string)?.trim()) || "main";
+  const apiKey = ((merged.apiKey as string)?.trim()) || undefined;
+  const timeoutMs = typeof merged.timeoutMs === "number" ? (merged.timeoutMs as number) : 15_000;
+  const expiresAfterSeconds = typeof merged.ephemeralExpiresAfterSeconds === "number"
+    ? (merged.ephemeralExpiresAfterSeconds as number)
+    : 300;
+  const model = req.model
+    ?? ((merged.model as string)?.trim())
+    ?? ((merged.realtimeModel as string)?.trim())
+    ?? DEFAULT_MODEL;
+  const voice = req.voice
+    ?? ((merged.voice as string)?.trim())
+    ?? ((merged.voiceId as string)?.trim())
+    ?? DEFAULT_VOICE;
+
+  const token = await mintXaiEphemeralToken({
+    agentId: authProfileAgent,
+    apiKeyOverride: apiKey,
+    expiresAfterSeconds,
+    timeoutMs,
+  });
+
+  // The client opens this WS directly with subprotocol `xai-client-secret.<token>`.
+  // Audio framing matches the gateway-relay bridge: PCM16 24kHz both ways.
+  const session: RealtimeVoiceBrowserJsonPcmWebSocketSession = {
+    provider: "xai-realtime",
+    transport: "provider-websocket",
+    protocol: `xai-client-secret.${token.value}`,
+    clientSecret: token.value,
+    websocketUrl: `${REALTIME_URL}?model=${encodeURIComponent(model)}`,
+    audio: {
+      inputEncoding: "pcm16",
+      inputSampleRateHz: 24000,
+      outputEncoding: "pcm16",
+      outputSampleRateHz: 24000,
+    },
+    model,
+    voice,
+    expiresAt: token.expiresAt,
+  };
+  return session;
+}
+
 export function buildXaiRealtimeVoiceProvider(): RealtimeVoiceProviderPlugin {
   return {
     id: "xai-realtime",
@@ -344,12 +395,12 @@ export function buildXaiRealtimeVoiceProvider(): RealtimeVoiceProviderPlugin {
     defaultModel: DEFAULT_MODEL,
     autoSelectOrder: 30,
     capabilities: {
-      transports: ["gateway-relay"],
+      // gateway-relay: gateway holds the xAI WS, browser talks to gateway.
+      // provider-websocket: gateway mints an ephemeral token; browser/iOS opens
+      // the xAI WS directly with subprotocol `xai-client-secret.<token>`.
+      transports: ["gateway-relay", "provider-websocket"],
       inputAudioFormats: [REALTIME_VOICE_AUDIO_FORMAT_PCM16_24KHZ],
       outputAudioFormats: [REALTIME_VOICE_AUDIO_FORMAT_PCM16_24KHZ],
-      // Browser sessions route through gateway-relay (gateway holds the xAI
-      // WebSocket; browser talks to gateway). xAI has no ephemeral-token
-      // endpoint, so we cannot do client-owned WebRTC.
       supportsBrowserSession: true,
       supportsBargeIn: true,
       supportsToolCalls: true,
@@ -366,5 +417,6 @@ export function buildXaiRealtimeVoiceProvider(): RealtimeVoiceProviderPlugin {
       return true;
     },
     createBridge: (req) => new XaiRealtimeVoiceBridge(req, resolveConfig(req)),
+    createBrowserSession: createXaiBrowserSession,
   };
 }

@@ -1,6 +1,6 @@
 {
   "name": "openclaw-xai-speech",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "xAI Grok speech synthesis (TTS) provider for OpenClaw — reuses SuperGrok OAuth bearer",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

@@ -37,9 +37,11 @@ describe("buildXaiRealtimeVoiceProvider", () => {
     expect(provider.label).toContain("xAI");
     expect(provider.defaultModel).toBe("grok-voice-think-fast-1.0");
     expect(provider.capabilities?.transports).toContain("gateway-relay");
+    expect(provider.capabilities?.transports).toContain("provider-websocket");
     expect(provider.capabilities?.supportsBargeIn).toBe(true);
     expect(provider.capabilities?.supportsToolCalls).toBe(true);
-    expect(provider.capabilities?.supportsBrowserSession).toBe(false);
+    expect(provider.capabilities?.supportsBrowserSession).toBe(true);
+    expect(typeof provider.createBrowserSession).toBe("function");
   });
 
   it("isConfigured returns true (lazy auth check)", () => {

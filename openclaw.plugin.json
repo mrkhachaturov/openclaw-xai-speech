@@ -74,6 +74,13 @@
         "description": "Max input characters per xAI /v1/tts call. Default 15000 (xAI documented cap, ~3-4 min audio). Text is truncated at sentence/word boundary above this length and a warning is logged.",
         "default": 15000,
         "minimum": 100
+      },
+      "ephemeralExpiresAfterSeconds": {
+        "type": "integer",
+        "description": "Lifetime of the ephemeral token minted for direct browser/iOS WebSocket sessions (transport=provider-websocket). Clamped to [60, 600]. Default 300.",
+        "default": 300,
+        "minimum": 60,
+        "maximum": 600
       }
     }
   }

@@ -150,6 +150,41 @@ export type RealtimeVoiceBridgeCreateRequest = RealtimeVoiceBridgeCallbacks & {
   tools?: RealtimeVoiceTool[];
 };
 
+export type RealtimeVoiceBrowserSessionCreateRequest = {
+  cfg?: unknown;
+  providerConfig: RealtimeVoiceProviderConfig;
+  instructions?: string;
+  tools?: RealtimeVoiceTool[];
+  model?: string;
+  voice?: string;
+  vadThreshold?: number;
+  silenceDurationMs?: number;
+  prefixPaddingMs?: number;
+  reasoningEffort?: string;
+};
+
+export type RealtimeVoiceBrowserAudioContract = {
+  inputEncoding: "pcm16" | "g711_ulaw";
+  inputSampleRateHz: number;
+  outputEncoding: "pcm16" | "g711_ulaw";
+  outputSampleRateHz: number;
+};
+
+export type RealtimeVoiceBrowserJsonPcmWebSocketSession = {
+  provider: string;
+  transport: "provider-websocket";
+  protocol: string;
+  clientSecret: string;
+  websocketUrl: string;
+  audio: RealtimeVoiceBrowserAudioContract;
+  initialMessage?: unknown;
+  model?: string;
+  voice?: string;
+  expiresAt?: number;
+};
+
+export type RealtimeVoiceBrowserSession = RealtimeVoiceBrowserJsonPcmWebSocketSession;
+
 export type RealtimeVoiceBridge = {
   supportsToolResultContinuation?: boolean;
   connect(): Promise<void>;
@@ -174,6 +209,7 @@ export type RealtimeVoiceProviderPlugin = {
   resolveConfig?: (ctx: RealtimeVoiceProviderResolveConfigContext) => RealtimeVoiceProviderConfig;
   isConfigured: (ctx: RealtimeVoiceProviderConfiguredContext) => boolean;
   createBridge: (req: RealtimeVoiceBridgeCreateRequest) => RealtimeVoiceBridge;
+  createBrowserSession?: (req: RealtimeVoiceBrowserSessionCreateRequest) => Promise<RealtimeVoiceBrowserSession>;
 };
 
 export type OpenClawPluginAPI = {

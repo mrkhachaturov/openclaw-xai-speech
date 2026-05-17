@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.3.0 — 2026-05-18
+
+### Features
+- **`createBrowserSession` for direct client→xAI realtime** — provider now mints
+  an xAI ephemeral token (`POST /v1/realtime/client_secrets`) and returns a
+  `provider-websocket` browser-session shape so iOS / Control UI can open
+  `wss://api.x.ai/v1/realtime` directly with `xai-client-secret.<token>` as the
+  WebSocket subprotocol. The OAuth bearer never leaves the gateway.
+- **Transport `"provider-websocket"`** added to capabilities alongside
+  `gateway-relay`. Gateway picks the right one based on client-requested
+  transport (`talk.client.create`).
+- **Config knob `ephemeralExpiresAfterSeconds`** (60–600, default 300) controls
+  token lifetime.
+- Tests: ephemeral mint POST body/headers/clamping/error path; browser session
+  shape (defaults, model URL-encoding, voice override, expiresAt passthrough).
+
+### Notes
+- Auto-refresh: the ephemeral mint reuses the same OAuth path as TTS, so a 401
+  triggers refresh-token rotation and one retry transparently.
+- iOS wiring is a follow-up patch in `build/openclaw/` (StGit, macOS-only) —
+  cookbook reference at `build/xai-cookbook/iOS/VoiceTesterApp/.../VoiceAgentWebSocket.swift`.
+
 ## 0.2.0 — 2026-05-18
 
 ### Features
