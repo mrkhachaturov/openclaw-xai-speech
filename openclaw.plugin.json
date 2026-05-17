@@ -1,0 +1,80 @@
+{
+  "id": "openclaw-xai-speech",
+  "activation": {
+    "onStartup": false
+  },
+  "enabledByDefault": true,
+  "contracts": {
+    "speechProviders": ["xai-speech"],
+    "realtimeVoiceProviders": ["xai-realtime"]
+  },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "voiceId": {
+        "type": "string",
+        "description": "xAI voice id (built-in or cloned from console.x.ai voice library). Default: empty (xAI server default).",
+        "default": ""
+      },
+      "language": {
+        "type": "string",
+        "description": "BCP-47 language hint passed to xAI TTS. Example: ru-RU, en-US.",
+        "default": "ru-RU"
+      },
+      "sampleRate": {
+        "type": "integer",
+        "description": "Output sample rate in Hz. Default: 24000.",
+        "default": 24000
+      },
+      "bitRate": {
+        "type": "integer",
+        "description": "MP3 bit rate (only when codec=mp3). Default: 64000.",
+        "default": 64000
+      },
+      "codec": {
+        "type": "string",
+        "description": "xAI native output codec. Default: mp3. ffmpeg conversion to Opus happens after for voice notes.",
+        "enum": ["mp3", "wav", "pcm", "mulaw", "alaw"],
+        "default": "mp3"
+      },
+      "baseUrl": {
+        "type": "string",
+        "description": "xAI API base URL. Default: https://api.x.ai/v1.",
+        "default": "https://api.x.ai/v1"
+      },
+      "authProfileAgent": {
+        "type": "string",
+        "description": "Agent id whose auth-profiles.json holds the xAI OAuth token. Default: main.",
+        "default": "main"
+      },
+      "apiKey": {
+        "type": "string",
+        "description": "Optional XAI_API_KEY override. If unset, the plugin uses the xAI OAuth profile from the specified agent (preferred for SuperGrok subscribers)."
+      },
+      "ffmpegPath": {
+        "type": "string",
+        "description": "ffmpeg binary path. Default: 'ffmpeg' (PATH lookup). Required for voice-note Opus conversion.",
+        "default": "ffmpeg"
+      },
+      "voiceNoteEncoding": {
+        "type": "string",
+        "description": "How to encode voice-note targets. 'opus' = ffmpeg convert to Opus (native voice bubbles); 'mp3' = ship native MP3 as a file attachment.",
+        "enum": ["opus", "mp3"],
+        "default": "opus"
+      },
+      "timeoutMs": {
+        "type": "integer",
+        "description": "HTTP timeout for xAI TTS request. Default: 60000 (long inputs need it).",
+        "default": 60000,
+        "minimum": 1000
+      },
+      "maxTextLength": {
+        "type": "integer",
+        "description": "Max input characters per xAI /v1/tts call. Default 15000 (xAI documented cap, ~3-4 min audio). Text is truncated at sentence/word boundary above this length and a warning is logged.",
+        "default": 15000,
+        "minimum": 100
+      }
+    }
+  }
+}
