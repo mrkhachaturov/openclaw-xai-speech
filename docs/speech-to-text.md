@@ -1,23 +1,20 @@
 #### Model Capabilities
 
-# Text to Speech
+# Speech to Text
 
-Convert text into spoken audio with a single API call. The API supports 5 expressive voices, inline speech tags for fine-grained delivery control, and output formats from high-fidelity MP3 to telephony-optimized μ-law.
+Transcribe audio files into text with a single API call, or stream audio in real time over WebSocket. The API supports 12 audio formats, word-level timestamps, multichannel transcription, and text formatting.
 
 ## Quick Start
 
-Generate speech with a single API call:
+Transcribe an audio file with a single API call:
 
 ```bash
-curl -X POST https://api.x.ai/v1/tts \
+curl -X POST https://api.x.ai/v1/stt \
   -H "Authorization: Bearer $XAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Hello! Welcome to the xAI Text to Speech API.",
-    "voice_id": "eve",
-    "language": "en"
-  }' \
-  --output hello.mp3
+  -F format=true \
+  -F language=en \
+  -F "keyterm=Understand The Universe" \
+  -F file=@audio.mp3
 ```
 
 ```python customLanguage="pythonWithoutSDK"
@@ -25,961 +22,357 @@ import os
 import requests
 
 response = requests.post(
-    "https://api.x.ai/v1/tts",
-    headers={
-        "Authorization": f"Bearer {os.environ['XAI_API_KEY']}",
-        "Content-Type": "application/json",
-    },
-    json={
-        "text": "Hello! Welcome to the xAI Text to Speech API.",
-        "voice_id": "eve",
-        "language": "en",
-    },
+    "https://api.x.ai/v1/stt",
+    headers={"Authorization": f"Bearer {os.environ['XAI_API_KEY']}"},
+    files={"file": ("audio.mp3", open("audio.mp3", "rb"), "audio/mpeg")},
+    data=[
+        ("format", "true"),
+        ("language", "en"),
+        ("keyterm", "Understand The Universe"),
+    ],
 )
 response.raise_for_status()
 
-with open("hello.mp3", "wb") as f:
-    f.write(response.content)
-
-print(f"Saved {len(response.content):,} bytes to hello.mp3")
+result = response.json()
+print(result["text"])
+print(f"Duration: {result['duration']}s")
+for word in result.get("words", []):
+    print(f"  {word['start']:.2f}s - {word['end']:.2f}s: {word['text']}")
 ```
 
 ```javascript customLanguage="javascriptWithoutSDK"
 import fs from "fs";
 
-const response = await fetch("https://api.x.ai/v1/tts", {
+const formData = new FormData();
+formData.append("format", "true");
+formData.append("language", "en");
+formData.append("keyterm", "Understand The Universe");
+formData.append("file", new Blob([fs.readFileSync("audio.mp3")]), "audio.mp3");
+
+const response = await fetch("https://api.x.ai/v1/stt", {
   method: "POST",
   headers: {
     Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-    "Content-Type": "application/json",
   },
-  body: JSON.stringify({
-    text: "Hello! Welcome to the xAI Text to Speech API.",
-    voice_id: "eve",
-    language: "en",
-  }),
+  body: formData,
 });
 
-if (!response.ok) throw new Error(`TTS error ${response.status}`);
+if (!response.ok) throw new Error(`STT error ${response.status}`);
 
-const buffer = Buffer.from(await response.arrayBuffer());
-fs.writeFileSync("hello.mp3", buffer);
-console.log(`Saved ${buffer.length.toLocaleString()} bytes to hello.mp3`);
+const result = await response.json();
+console.log(result.text);
+console.log(`Duration: ${result.duration}s`);
+for (const word of result.words ?? []) {
+  console.log(`  ${word.start.toFixed(2)}s - ${word.end.toFixed(2)}s: ${word.text}`);
+}
 ```
 
-```swift
-import Foundation
+Note: The `file` parameter must be provided after all other parameters in the multipart form.
 
-let apiKey = ProcessInfo.processInfo.environment["XAI_API_KEY"]!
-let url = URL(string: "https://api.x.ai/v1/tts")!
-var request = URLRequest(url: url)
-request.httpMethod = "POST"
-request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-request.httpBody = try JSONSerialization.data(withJSONObject: [
-    "text": "Hello! Welcome to the xAI Text to Speech API.",
-    "voice_id": "eve",
-    "language": "en",
-])
-
-let (data, _) = try await URLSession.shared.data(for: request)
-let fileURL = URL(fileURLWithPath: "hello.mp3")
-try data.write(to: fileURL)
-
-print("Saved \(data.count) bytes to hello.mp3")
-```
-
-The response body contains raw audio bytes. Save directly to a file or pipe to an audio player.
-
-[Try the Playground →](https://console.x.ai/team/default/voice/text-to-speech?campaign=voice-docs-tts)
+[Get API Key →](https://console.x.ai/team/default/api-keys?campaign=voice-docs-stt)
 
 [Live Voice Demos](https://x.ai/api/voice)
 
-[Get API Key](https://console.x.ai/team/default/api-keys?campaign=voice-docs-tts)
+## Supported Languages
+
+The `language` parameter enables formatting for the following languages. The model transcribes speech in any of these languages regardless of the `language` parameter — setting it enables formatting of numbers, currencies, and units into their written form.
+
+| Language | Code | | Language | Code |
+|----------|------|-|----------|------|
+| Arabic | `ar` | | Macedonian | `mk` |
+| Czech | `cs` | | Malay | `ms` |
+| Danish | `da` | | Persian | `fa` |
+| Dutch | `nl` | | Polish | `pl` |
+| English | `en` | | Portuguese | `pt` |
+| Filipino | `fil` | | Romanian | `ro` |
+| French | `fr` | | Russian | `ru` |
+| German | `de` | | Spanish | `es` |
+| Hindi | `hi` | | Swedish | `sv` |
+| Indonesian | `id` | | Thai | `th` |
+| Italian | `it` | | Turkish | `tr` |
+| Japanese | `ja` | | Vietnamese | `vi` |
+| Korean | `ko` | | | |
 
 ## Request Body
 
-| Parameter | Type | Required | Description |
-|-----------|------|----------|-------------|
-| `text` | string | ✓ | The text to convert to speech. Maximum **15,000 characters**. Supports [speech tags](#speech-tags). |
-| `voice_id` | string | | Voice to use for synthesis. Defaults to `eve`. See [Voices](#voices). |
-| `language` | string | ✓ | BCP-47 language code (e.g. `en`, `zh`, `pt-BR`) or `auto` for automatic language detection. See [Supported Languages](#supported-languages). |
-| `output_format` | object | | Output format configuration. Defaults to MP3 at 24 kHz / 128 kbps. See [Output Formats](#output-formats). |
-| `optimize_streaming_latency` | integer | | Latency optimization level for streaming synthesis. `0` (default): No optimization — best audio quality. `1`: Reduced first-chunk size for lower time-to-first-audio, with minor quality tradeoff at chunk boundaries. |
-| `text_normalization` | boolean | | Enable text normalization before synthesis. When `true`, the model normalizes written-form text (e.g. numbers, abbreviations, symbols) into spoken-form before generating audio. Defaults to `false`. |
+The request uses `multipart/form-data`. Either `file` or `url` must be provided.
 
-### Example with all options
+| Parameter | Type | Default | Required | Description |
+|-----------|------|---------|----------|-------------|
+| `file` | file | | ✓† | Audio file to transcribe. Max **500 MB**. See [Supported Formats](#supported-audio-formats). Must be the last field in the multipart form. |
+| `url` | string | | ✓† | URL of an audio file to download and transcribe (server-side). |
+| `audio_format` | string | | | Format hint for raw/headerless audio: `pcm`, `mulaw`, `alaw`. Container formats are auto-detected — do not set this field for MP3, WAV, etc. |
+| `sample_rate` | integer | | | Sample rate in Hz. Only required for raw audio (`pcm`, `mulaw`, `alaw`). Supported: `8000`, `16000`, `22050`, `24000`, `44100`, `48000`. |
+| `language` | string | | | Language code (e.g. `en`, `fr`, `de`). Used with `format=true` to enable text formatting. See [Supported Languages](#supported-languages). |
+| `format` | boolean | `false` | | When `true`, enables Inverse Text Normalization — converts spoken numbers/currency to written form (e.g. "one hundred dollars" → "$100"). Requires `language`. |
+| `multichannel` | boolean | `false` | | When `true`, transcribes each audio channel independently. Results returned in the `channels` array. |
+| `channels` | integer | | | Number of audio channels (2–8). Only required for multichannel raw audio. Auto-detected for container formats. |
+| `diarize` | boolean | `false` | | When `true`, enables speaker diarization. Each word in the response includes a `speaker` field (integer) identifying the detected speaker. |
+| `keyterm` | string | | | A key term to bias transcription toward (e.g. product names, proper nouns). Repeat the field for multiple terms (e.g. `keyterm=Understand+The+Universe`). Max 100 terms, each up to 50 characters. |
+| `filler_words` | boolean | `false` | | When `true`, filler words (e.g. "uh", "um", "er") are included in the transcript. When `false` (default), filler words are automatically removed from the transcript text and the `words` array. |
+
+† Either `file` or `url` must be provided.
+
+### Example with text formatting
+
+```bash
+curl -X POST https://api.x.ai/v1/stt \
+  -H "Authorization: Bearer $XAI_API_KEY" \
+  -F format=true \
+  -F language=en \
+  -F "keyterm=Understand The Universe" \
+  -F file=@meeting.mp3
+```
+
+The `file` parameter must be provided after all other parameters in the multipart form.
+
+## Response
+
+The response includes the full transcript, audio duration, and word-level timestamps.
 
 ```json
 {
-  "text": "Hello! This is a high-fidelity text to speech example.",
-  "voice_id": "ara",
-  "language": "en",
-  "output_format": {
-    "codec": "mp3",
-    "sample_rate": 44100,
-    "bit_rate": 192000
-  }
+  "text": "The balance is $167,983.15.",
+  "language": "English",
+  "duration": 3.45,
+  "words": [
+    { "text": "The", "start": 0.24, "end": 0.48 },
+    { "text": "balance", "start": 0.48, "end": 0.96 },
+    { "text": "is", "start": 0.96, "end": 1.12 },
+    { "text": "$167,983.15.", "start": 1.12, "end": 3.20 }
+  ]
 }
 ```
 
-## Voices
-
-Five voices are available, each with a distinct personality. Listen to samples and choose the best fit for your use case:
-
-| Voice | Tone | Description | Sample |
-|-------|------|-------------|:------:|
-| **`eve`** | Energetic, upbeat | Default voice - engaging and enthusiastic |  |
-| **`ara`** | Warm, friendly | Balanced and conversational |  |
-| **`rex`** | Confident, clear | Professional and articulate - ideal for business |  |
-| **`sal`** | Smooth, balanced | Versatile voice for a wide range of contexts |  |
-| **`leo`** | Authoritative, strong | Commanding and decisive - great for instructional content |  |
-
-Voice IDs are **case-insensitive** - `eve`, `Eve`, and `EVE` all work. [Preview all voices in the playground →](https://console.x.ai/team/default/voice/text-to-speech?campaign=voice-docs-tts)
-
-### Choosing the right voice
-
-* **`eve`** - Great default for demos, announcements, and upbeat content
-* **`ara`** - Ideal for conversational interfaces, customer support, and warm narration
-* **`rex`** - Best for business presentations, corporate communications, and tutorials
-* **`sal`** - Versatile choice for balanced delivery across different content types
-* **`leo`** - Perfect for authoritative narration, instructions, and educational content
-
-### Custom voices
-
-Clone any voice from a short reference clip with the [Custom Voices API](/developers/model-capabilities/audio/custom-voices), or create one for free in the [console](https://console.x.ai/team/default/voice/voice-library?campaign=voice-docs-tts). To find your custom voice ID in the console, click the three-dot menu on the voice card and select **Copy Voice ID**. Then pass it as `voice_id`:
-
-```bash
-curl -X POST https://api.x.ai/v1/tts \
-  -H "Authorization: Bearer $XAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "Hello! This is my custom voice.",
-    "voice_id": "nlbqfwie",
-    "language": "en"
-  }' \
-  --output hello.mp3
-```
-
-```python customLanguage="pythonWithoutSDK"
-import os
-import requests
-
-response = requests.post(
-    "https://api.x.ai/v1/tts",
-    headers={
-        "Authorization": f"Bearer {os.environ['XAI_API_KEY']}",
-        "Content-Type": "application/json",
-    },
-    json={
-        "text": "Hello! This is my custom voice.",
-        "voice_id": "nlbqfwie",  # your custom voice ID
-        "language": "en",
-    },
-)
-with open("hello.mp3", "wb") as f:
-    f.write(response.content)
-```
-
-```javascript customLanguage="javascriptWithoutSDK"
-import fs from "fs";
-
-const response = await fetch("https://api.x.ai/v1/tts", {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    text: "Hello! This is my custom voice.",
-    voice_id: "nlbqfwie", // your custom voice ID
-    language: "en",
-  }),
-});
-fs.writeFileSync("hello.mp3", Buffer.from(await response.arrayBuffer()));
-```
-
-You can also list voices programmatically with the [Text to speech - List voices](/developers/rest-api-reference/inference/voice#text-to-speech---list-voices) endpoint:
-
-```bash
-curl -s https://api.x.ai/v1/tts/voices \
-  -H "Authorization: Bearer $XAI_API_KEY"
-```
-
-```python customLanguage="pythonWithoutSDK"
-import os
-import requests
-
-response = requests.get(
-    "https://api.x.ai/v1/tts/voices",
-    headers={"Authorization": f"Bearer {os.environ['XAI_API_KEY']}"},
-)
-for voice in response.json()["voices"]:
-    print(f"{voice['voice_id']:5s}  {voice['name']}")
-```
-
-```javascript customLanguage="javascriptWithoutSDK"
-const response = await fetch("https://api.x.ai/v1/tts/voices", {
-  headers: { Authorization: `Bearer ${process.env.XAI_API_KEY}` },
-});
-const { voices } = await response.json();
-voices.forEach((v) => console.log(`${v.voice_id}  ${v.name}`));
-```
-
-```swift
-import Foundation
-
-let apiKey = ProcessInfo.processInfo.environment["XAI_API_KEY"]!
-let url = URL(string: "https://api.x.ai/v1/tts/voices")!
-var request = URLRequest(url: url)
-request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-
-let (data, _) = try await URLSession.shared.data(for: request)
-let json = try JSONSerialization.jsonObject(with: data) as! [String: Any]
-let voices = json["voices"] as! [[String: Any]]
-for voice in voices {
-    print("\(voice["voice_id"]!)  \(voice["name"]!)")
-}
-```
-
-## Supported Languages
-
-The TTS API supports 20 languages via BCP-47 language codes. Use `auto` for automatic language detection, or specify a language code explicitly for consistent results.
-
-Language code validation is **case-insensitive** — `en`, `EN`, and `En` all work.
-
-| Language | Language Code |
-|----------|---------------|
-| Auto-detect | `auto` |
-| English | `en` |
-| Arabic (Egypt) | `ar-EG` |
-| Arabic (Saudi Arabia) | `ar-SA` |
-| Arabic (United Arab Emirates) | `ar-AE` |
-| Bengali | `bn` |
-| Chinese (Simplified) | `zh` |
-| French | `fr` |
-| German | `de` |
-| Hindi | `hi` |
-| Indonesian | `id` |
-| Italian | `it` |
-| Japanese | `ja` |
-| Korean | `ko` |
-| Portuguese (Brazil) | `pt-BR` |
-| Portuguese (Portugal) | `pt-PT` |
-| Russian | `ru` |
-| Spanish (Mexico) | `es-MX` |
-| Spanish (Spain) | `es-ES` |
-| Turkish | `tr` |
-| Vietnamese | `vi` |
-
-The model is also capable of generating speech in additional languages beyond those listed above, with varying degrees of accuracy.
-
-## Speech Tags
-
-*Example:* So I walked in and \[pause] there it was. \[laugh] I honestly could not believe it! \<whisper>It was a secret the whole time.\</whisper> Pretty cool, right?
-
-Add inline speech tags to your text for expressive delivery. There are two types of tags:
-
-* **Inline tags** `[tag]` — placed at a specific point in the text to produce a vocal expression (e.g. a laugh or pause)
-* **Wrapping tags** `<tag>text</tag>` — wrap a section of text to change how it is delivered (e.g. whispering, singing)
-
-### Inline Tags
-
-Insert these where the expression should occur. Click any tag to hear an example:
-
-| Category | Tags |
-|----------|------|
-| **Pauses** |    |
-| **Laughter & crying** |     |
-| **Mouth sounds** |    |
-| **Breathing** |     |
-
-### Wrapping Tags
-
-Wrap text to change delivery style. Use an opening tag and a matching closing tag. Click any tag to hear an example:
-
-| Category | Tags |
-|----------|------|
-| **Volume & intensity** |      |
-| **Pitch & speed** |     |
-| **Vocal style** |     |
-
-### Examples
-
-```bash
-# Inline tags
-curl -X POST https://api.x.ai/v1/tts \
-  -H "Authorization: Bearer $XAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "So I walked in and [pause] there it was. [laugh] I honestly could not believe it!",
-    "voice_id": "eve",
-    "language": "en"
-  }' \
-  --output expressive.mp3
-
-# Wrapping tags
-curl -X POST https://api.x.ai/v1/tts \
-  -H "Authorization: Bearer $XAI_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "text": "I need to tell you something. <whisper>It is a secret.</whisper> Pretty cool, right?",
-    "voice_id": "eve",
-    "language": "en"
-  }' \
-  --output whisper.mp3
-```
-
-```python customLanguage="pythonWithoutSDK"
-import os
-import requests
-
-# Inline tags
-response = requests.post(
-    "https://api.x.ai/v1/tts",
-    headers={
-        "Authorization": f"Bearer {os.environ['XAI_API_KEY']}",
-        "Content-Type": "application/json",
-    },
-    json={
-        "text": "So I walked in and [pause] there it was. [laugh] I honestly could not believe it!",
-        "voice_id": "eve",
-        "language": "en",
-    },
-)
-response.raise_for_status()
-
-with open("expressive.mp3", "wb") as f:
-    f.write(response.content)
-
-# Wrapping tags
-response = requests.post(
-    "https://api.x.ai/v1/tts",
-    headers={
-        "Authorization": f"Bearer {os.environ['XAI_API_KEY']}",
-        "Content-Type": "application/json",
-    },
-    json={
-        "text": "I need to tell you something. <whisper>It is a secret.</whisper> Pretty cool, right?",
-        "voice_id": "eve",
-        "language": "en",
-    },
-)
-response.raise_for_status()
-
-with open("whisper.mp3", "wb") as f:
-    f.write(response.content)
-```
-
-```javascript customLanguage="javascriptWithoutSDK"
-// Inline tags
-const response = await fetch("https://api.x.ai/v1/tts", {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    text: "So I walked in and [pause] there it was. [laugh] I honestly could not believe it!",
-    voice_id: "eve",
-    language: "en",
-  }),
-});
-
-// Wrapping tags
-const whisperResponse = await fetch("https://api.x.ai/v1/tts", {
-  method: "POST",
-  headers: {
-    Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-    "Content-Type": "application/json",
-  },
-  body: JSON.stringify({
-    text: "I need to tell you something. <whisper>It is a secret.</whisper> Pretty cool, right?",
-    voice_id: "eve",
-    language: "en",
-  }),
-});
-```
-
-```swift
-import Foundation
-
-let apiKey = ProcessInfo.processInfo.environment["XAI_API_KEY"]!
-let url = URL(string: "https://api.x.ai/v1/tts")!
-
-// Inline tags
-var request = URLRequest(url: url)
-request.httpMethod = "POST"
-request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-request.httpBody = try JSONSerialization.data(withJSONObject: [
-    "text": "So I walked in and [pause] there it was. [laugh] I honestly could not believe it!",
-    "voice_id": "eve",
-    "language": "en",
-])
-
-let (data, _) = try await URLSession.shared.data(for: request)
-try data.write(to: URL(fileURLWithPath: "expressive.mp3"))
-
-// Wrapping tags
-request.httpBody = try JSONSerialization.data(withJSONObject: [
-    "text": "I need to tell you something. <whisper>It is a secret.</whisper> Pretty cool, right?",
-    "voice_id": "eve",
-    "language": "en",
-])
-
-let (whisperData, _) = try await URLSession.shared.data(for: request)
-try whisperData.write(to: URL(fileURLWithPath: "whisper.mp3"))
-```
-
-**Tips for speech tags:**
-
-* Place inline tags where the expression would naturally occur in conversation
-* Combine tags with punctuation — `"Really? [laugh] That's incredible!"` produces more natural results than stacking tags
-* Use `[pause]` or `[long-pause]` to add dramatic timing or let a thought land
-* Wrapping tags work best around complete phrases — `<whisper>It is a secret.</whisper>` reads more naturally than wrapping individual words
-* Combine styles for effect — `<slow><soft>Goodnight, sleep well.</soft></slow>`
-
-## Output Formats
-
-Control the audio codec, sample rate, and bit rate with the `output_format` object. When omitted, the default is **MP3 at 24 kHz / 128 kbps**.
-
-### Codecs
-
-| Codec | Content-Type | Best for |
-|-------|-------------|----------|
-| `mp3` | `audio/mpeg` | General use - wide compatibility, good compression |
-| `wav` | `audio/wav` | Lossless audio - editing, post-production |
-| `pcm` | `audio/pcm` | Raw audio - real-time processing pipelines |
-| `mulaw` | `audio/basic` | Telephony (G.711 μ-law) |
-| `alaw` | `audio/alaw` | Telephony (G.711 A-law) |
-
-### Sample Rates
-
-| Rate | Description |
-|------|-------------|
-| `8000` | Narrowband - telephony |
-| `16000` | Wideband - speech recognition |
-| `22050` | Standard - balanced quality |
-| `24000` | High quality - **default**, recommended for most use cases |
-| `44100` | CD quality - media production |
-| `48000` | Professional - studio-grade audio |
-
-### Bit Rates (MP3 only)
-
-| Rate | Quality |
-|------|---------|
-| `32000` | Low - smallest file size |
-| `64000` | Medium - good for speech |
-| `96000` | Standard - balanced |
-| `128000` | High - **default**, recommended |
-| `192000` | Maximum - highest fidelity |
-
-### Example: High-fidelity MP3
-
-```json
-{
-  "text": "Crystal clear audio at maximum quality.",
-  "voice_id": "rex",
-  "language": "en",
-  "output_format": {
-    "codec": "mp3",
-    "sample_rate": 44100,
-    "bit_rate": 192000
-  }
-}
-```
-
-### Example: Telephony (μ-law)
-
-```json
-{
-  "text": "Hello, thank you for calling. How can I help you today?",
-  "voice_id": "ara",
-  "language": "en",
-  "output_format": {
-    "codec": "mulaw",
-    "sample_rate": 8000
-  }
-}
-```
-
-## Best Practices
-
-Tips for getting the highest quality output from the TTS API.
-
-### Writing effective text
-
-* **Use natural punctuation.** Commas, periods, and question marks guide pacing and intonation. `"Wait, really?"` sounds more natural than `"Wait really"`.
-* **Add emotional context.** Exclamation marks and question marks influence delivery - `"That's amazing!"` sounds enthusiastic while `"That's amazing."` is matter-of-fact.
-* **Break long content into paragraphs.** Paragraph breaks create natural pauses and help the model maintain consistent quality across longer text.
-* **Keep unary requests under 15,000 characters.** For longer content, use the [bidirectional WebSocket endpoint](#streaming-tts-websocket) which has no text length limit, or split into logical segments (by paragraph or sentence) and concatenate the audio output.
-
-### Integrating with AI coding assistants
-
-The [Cloud Console playground](https://console.x.ai/team/default/voice/text-to-speech?campaign=voice-docs-tts) includes ready-made **agent instructions** you can copy and paste into tools like Cursor, GitHub Copilot, or Windsurf. The instructions are pre-configured with your current voice and format settings - open the playground, tweak your settings, and copy the prompt to get a tailored integration guide for your coding agent.
-
-### Optimizing for production
-
-* **Proxy requests server-side.** Never expose your API key in client-side code. Route TTS requests through your backend.
-* **Cache generated audio.** If the same text is requested repeatedly, cache the audio bytes to save API calls and reduce latency.
-* **Match the format to the use case.** Use `mulaw` or `alaw` at 8 kHz for telephony; `mp3` at 24 kHz for web; `wav` at 44.1+ kHz for post-production.
-* **Respect concurrent session limits.** The streaming WebSocket endpoint allows up to **50 concurrent sessions per team**. For high-throughput services, pool connections or queue requests to stay within this limit.
-
-## Browser Playback
-
-To play TTS audio in the browser, proxy the request through your backend and use the Web Audio API or an `<audio>` element:
-
-```javascript customLanguage="javascriptWithoutSDK"
-// Client-side: fetch from your backend proxy, then play
-async function speakText(text, voiceId = "eve") {
-  const response = await fetch("/api/tts", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text, voice_id: voiceId }),
-  });
-
-  if (!response.ok) throw new Error("TTS request failed");
-
-  const blob = await response.blob();
-  const url = URL.createObjectURL(blob);
-
-  const audio = new Audio(url);
-  audio.addEventListener("ended", () => URL.revokeObjectURL(url));
-  await audio.play();
-}
-
-// Usage
-await speakText("Hello from the browser!");
-```
-
-> [!WARNING]
->
-> **Never call the TTS API directly from the browser** - this would expose your API key. Always proxy through your backend.
-
-### Browser gotchas
-
-**Safari returns `Infinity` for `audio.duration` on blob URLs.** The `loadedmetadata` event fires but `audio.duration` is `Infinity`, breaking seek bars and time displays. Use `AudioContext.decodeAudioData()` instead:
-
-```javascript customLanguage="javascriptWithoutSDK"
-async function getAudioDuration(arrayBuffer) {
-  const AudioCtx = window.AudioContext || window.webkitAudioContext;
-  const ctx = new AudioCtx();
-  // Clone the buffer - decodeAudioData detaches the original
-  const decoded = await ctx.decodeAudioData(arrayBuffer.slice(0));
-  const durationMs = Math.round(decoded.duration * 1000);
-  await ctx.close();
-  return durationMs;
-}
-```
-
-**`AudioContext` must be created during a user gesture on Safari.** Safari permanently suspends an `AudioContext` created outside a click/tap handler, with no way to resume it. Chrome is more lenient. Always create or resume the context in your button's click handler, before any `await`:
-
-```javascript customLanguage="javascriptWithoutSDK"
-// Create the AudioContext once, in a click handler
-let audioCtx;
-button.addEventListener("click", async () => {
-  // This MUST happen synchronously in the click handler for Safari
-  if (!audioCtx) audioCtx = new AudioContext();
-  if (audioCtx.state === "suspended") await audioCtx.resume();
-
-  // Now it's safe to fetch and play audio asynchronously
-  const response = await fetch("/api/tts", { /* ... */ });
-  const arrayBuffer = await response.arrayBuffer();
-  const decoded = await audioCtx.decodeAudioData(arrayBuffer);
-  const source = audioCtx.createBufferSource();
-  source.buffer = decoded;
-  source.connect(audioCtx.destination);
-  source.start();
-});
-```
-
-**Raw codecs (pcm, mulaw, alaw) are not playable in the browser.** `AudioContext.decodeAudioData()` and `<audio>` elements only support container formats like MP3 and WAV. Use `mp3` or `wav` for browser playback. If you're working with raw formats server-side (e.g., piping to telephony), estimate duration from byte count:
-
-```javascript customLanguage="javascriptWithoutSDK"
-// PCM = 16-bit LE (2 bytes/sample), mulaw/alaw = 8-bit (1 byte/sample)
-const bytesPerSample = codec === "pcm" ? 2 : 1;
-const durationMs = Math.round((byteLength / bytesPerSample / sampleRate) * 1000);
-```
-
-**Revoke blob URLs to avoid memory leaks.** Each `URL.createObjectURL()` call allocates memory that persists until explicitly freed. Revoke URLs when playback ends. For downloads, delay revocation so the browser finishes saving the file:
-
-```javascript customLanguage="javascriptWithoutSDK"
-// Playback: revoke when done
-const url = URL.createObjectURL(blob);
-const audio = new Audio(url);
-audio.addEventListener("ended", () => URL.revokeObjectURL(url));
-
-// Downloads: delay revocation
-const downloadUrl = URL.createObjectURL(blob);
-const a = document.createElement("a");
-a.href = downloadUrl;
-a.download = "speech.mp3";
-a.click();
-setTimeout(() => URL.revokeObjectURL(downloadUrl), 10_000);
-```
-
-## Error Handling
-
-| Status | Meaning | Action |
-|--------|---------|--------|
-| `200` | Success | Audio bytes in the response body |
-| `400` | Bad request | Check: text is non-empty, under 15,000 chars; codec and sample rate are valid |
-| `401` | Unauthorized | API key is missing or invalid |
-| `429` | Rate limited | Back off and retry with exponential delay |
-| `503` | Service unavailable | TTS service is temporarily unavailable - retry |
-| `500` | Server error | Retry with exponential backoff |
-
-### Retry with backoff
-
-```python customLanguage="pythonWithoutSDK"
-import os
-import time
-import requests
-
-def generate_speech(text, language="en", voice_id="eve", max_retries=3):
-    for attempt in range(max_retries):
-        response = requests.post(
-            "https://api.x.ai/v1/tts",
-            headers={
-                "Authorization": f"Bearer {os.environ['XAI_API_KEY']}",
-                "Content-Type": "application/json",
-            },
-            json={"text": text, "language": language, "voice_id": voice_id},
-        )
-        if response.ok:
-            return response.content
-        if response.status_code in (429, 500, 503):
-            wait = 2 ** attempt
-            time.sleep(wait)
-            continue
-        response.raise_for_status()  # Non-retryable error
-    raise RuntimeError("Max retries exceeded")
-```
-
-```javascript customLanguage="javascriptWithoutSDK"
-async function generateSpeech(text, language = "en", voiceId = "eve", maxRetries = 3) {
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    const response = await fetch("https://api.x.ai/v1/tts", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.XAI_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ text, language, voice_id: voiceId }),
-    });
-
-    if (response.ok) return Buffer.from(await response.arrayBuffer());
-
-    if ([429, 500, 503].includes(response.status)) {
-      await new Promise((r) => setTimeout(r, 2 ** attempt * 1000));
-      continue;
-    }
-    throw new Error(`TTS error ${response.status}: ${await response.text()}`);
-  }
-  throw new Error("Max retries exceeded");
-}
-```
-
-```swift
-import Foundation
-
-func generateSpeech(text: String, language: String = "en", voiceId: String = "eve", maxRetries: Int = 3) async throws -> Data {
-    let apiKey = ProcessInfo.processInfo.environment["XAI_API_KEY"]!
-    let url = URL(string: "https://api.x.ai/v1/tts")!
-
-    for attempt in 0..<maxRetries {
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try JSONSerialization.data(withJSONObject: [
-            "text": text, "language": language, "voice_id": voiceId,
-        ])
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-        let status = (response as! HTTPURLResponse).statusCode
-        if status == 200 { return data }
-        if [429, 500, 503].contains(status) {
-            try await Task.sleep(nanoseconds: UInt64(pow(2.0, Double(attempt))) * 1_000_000_000)
-            continue
-        }
-        throw URLError(.badServerResponse)
-    }
-    throw URLError(.timedOut)
-}
-```
-
-## Limits
-
-The unary/server-streamed endpoints and the bidirectional WebSocket endpoint have different limits:
-
-| | Unary & server-streamed (`POST /v1/tts`) | Bidirectional WebSocket (`wss://api.x.ai/v1/tts`) |
-|---|---|---|
-| **Max text length** | 15,000 characters per request | No limit — individual `text.delta` messages capped at 15,000 characters each |
-| **Request timeout** | 15 minutes | No timeout (connection stays open) |
-| **Concurrent sessions** | — | 50 per team |
-
-For content exceeding 15,000 characters, use the [bidirectional WebSocket endpoint](#streaming-tts-websocket) which has no text length limit.
-
-## Streaming TTS (WebSocket)
-
-For real-time audio generation, open a WebSocket connection to the streaming TTS endpoint. Text is streamed in as deltas and audio is streamed back as base64-encoded chunks — ideal for interactive applications where you want audio to start playing before the full text is available.
-
-**Endpoint:** `wss://api.x.ai/v1/tts`
+| Field | Type | Description |
+|-------|------|-------------|
+| `text` | string | Full transcript text. |
+| `language` | string | Detected language name (e.g. `"English"`, `"French"`). |
+| `duration` | number | Audio duration in seconds (2 d.p.). |
+| `words` | array | Word-level segments with `text`, `start`, `end`, and `speaker` (integer, only when `diarize=true`). |
+| `channels` | array | Per-channel transcripts (only when `multichannel=true`). Each entry has `index`, `text`, and `words`. |
+
+## Supported Audio Formats
+
+### Container formats (auto-detected)
+
+| Format | Extension | Description |
+|--------|-----------|-------------|
+| WAV | `.wav` | Waveform Audio — lossless, best quality input |
+| MP3 | `.mp3` | MPEG Audio Layer 3 — widely supported |
+| OGG | `.ogg` | Ogg container — open format |
+| Opus | `.opus` | Opus codec — low-latency, high quality |
+| FLAC | `.flac` | Free Lossless Audio Codec — lossless compression |
+| AAC | `.aac` | Advanced Audio Coding |
+| MP4 | `.mp4` | MPEG-4 container |
+| M4A | `.m4a` | MPEG-4 Audio — Apple ecosystem standard |
+| MKV | `.mkv` | Matroska container — supports MP3, AAC, and FLAC audio codecs |
+
+### Raw formats (require `audio_format` and `sample_rate`)
+
+| Format | `audio_format` value | Description |
+|--------|---------------------|-------------|
+| PCM | `pcm` | Signed 16-bit little-endian (2 bytes/sample) |
+| µ-law | `mulaw` | G.711 µ-law (1 byte/sample) |
+| A-law | `alaw` | G.711 A-law (1 byte/sample) |
+
+### Limits
+
+* **Max file size:** 500 MB
+* **Channels:** Mono, stereo, or up to 8 channels (with `multichannel=true`)
+* **Sample rates:** 8000, 16000, 22050, 24000, 44100, 48000 Hz
+
+## Streaming Speech-to-Text (WebSocket)
+
+For real-time transcription, use the WebSocket API at `wss://api.x.ai/v1/stt`. The client streams raw audio as binary WebSocket frames and receives JSON transcript events as the audio is processed.
+
+**Endpoint:** `wss://api.x.ai/v1/stt`
+
+Configuration is done via URL query parameters — no setup message required. Audio is sent as raw binary frames (no base64 encoding).
 
 > [!NOTE]
 >
 > **Never expose your API key in client-side code.** Always proxy WebSocket connections through your backend.
 
-### Connection
+### Query Parameters
 
-Open a WebSocket connection with query parameters to configure language, voice, and audio format:
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `sample_rate` | integer | `16000` | Audio sample rate in Hz. |
+| `encoding` | string | `pcm` | Audio encoding: `pcm`, `mulaw`, or `alaw`. |
+| `interim_results` | boolean | `false` | When `true`, emit partial transcripts `is_final=false` every ~500 ms. |
+| `endpointing` | integer | `10` | Silence duration (ms) before utterance-final event. Range: 0–5000. `0` = fire on any VAD silence boundary. |
+| `language` | string | | Language code for text formatting. See [Supported Languages](#supported-languages). |
+| `diarize` | boolean | | When `true`, enables speaker diarization. Words include a `speaker` field identifying the detected speaker. |
+| `filler_words` | boolean | `false` | When `true`, filler words (e.g. `uh`, `um`, `er`) are included in the transcript. When `false` (default), filler words are automatically removed. |
+| `multichannel` | boolean | `false` | Per-channel transcription. Requires `channels` ≥ 2. |
+| `channels` | integer | `1` | Number of interleaved audio channels (max 8). |
+| `keyterm` | string | | A key term to bias transcription toward (e.g. product names, proper nouns). Repeat the parameter for multiple terms (e.g. `keyterm=Understand+The+Universe`). Max 100 terms, each up to 50 characters. |
 
-```
-GET /v1/tts?language=en&voice=eve&codec=mp3&sample_rate=24000&bit_rate=128000
-Upgrade: websocket
-Authorization: Bearer $XAI_API_KEY
-```
-
-| Parameter | Required | Default | Accepted values |
-|-----------|----------|---------|-----------------|
-| `voice` | | `eve` | `ara`, `eve`, `leo`, `rex`, `sal` |
-| `language` | ✓ | | `auto` or BCP-47 codes (e.g. `en`, `zh`, `pt-BR`). See [Supported Languages](#supported-languages). |
-| `codec` | | `mp3` | `mp3`, `wav`, `pcm`, `mulaw` (or `ulaw`), `alaw` |
-| `sample_rate` | | `24000` | `8000`, `16000`, `22050`, `24000`, `44100`, `48000` |
-| `bit_rate` | | `128000` | `32000`, `64000`, `96000`, `128000`, `192000` (MP3 only) |
-| `optimize_streaming_latency` | | `0` | `0` (off, best quality), `1` (on, lower time-to-first-audio) |
-| `text_normalization` | | `false` | `true`, `false` |
-
-An invalid `voice`, `language`, `codec`, or `sample_rate` is rejected **before** the WebSocket upgrade with an HTTP 400 or 404.
-
-### Client → Server Messages
-
-Send text to the server as JSON text frames. Split your text across multiple `text.delta` messages, then signal the end of the utterance with `text.done`:
-
-```json
-{"type": "text.delta", "delta": "Here is some text. "}
-{"type": "text.delta", "delta": "More text follows."}
-{"type": "text.done"}
-```
+### Server Events
 
 | Event | Description |
 |-------|-------------|
-| `text.delta` | A chunk of text to synthesize. Individual deltas are capped at **15,000 characters**. |
-| `text.done` | Signals the end of the current utterance. The server will finish generating audio and send `audio.done`. |
+| `transcript.created` | Server ready — wait for this before sending audio. |
+| `transcript.partial` | Transcript result with `text`, `words`, `is_final`, `speech_final`, `start`, `duration`. Includes `channel_index` when `multichannel=true`. |
+| `transcript.done` | Final transcript after `audio.done`. `duration` always present. Includes `channel_index` when `multichannel=true` — one event sent per channel. Connection closes after this. |
+| `error` | Error with `message` field. Connection stays open. |
 
-### Server → Client Messages
+The `transcript.partial` event uses `is_final` and `speech_final` to convey three states:
 
-The server responds with base64-encoded audio chunks and a completion event:
+| `is_final` | `speech_final` | Meaning |
+|:---:|:---:|---|
+| `false` | `false` | **Interim** — text may change (only when `interim_results=true`) |
+| `true` | `false` | **Chunk final** — text locked, ~3s of speech finalized |
+| `true` | `true` | **Utterance final** — speaker stopped, complete stitched utterance |
 
-```json
-{"type": "audio.delta", "delta": "<base64-encoded audio bytes>"}
-{"type": "audio.done", "trace_id": "uuid"}
-{"type": "error", "message": "description"}
+### Client Messages
+
+* **Binary frames** — raw audio in the specified encoding (streamed in real-time-paced chunks, e.g. 100 ms)
+* **`{"type": "audio.done"}`** — signal end of audio, triggers `transcript.done`
+
+`transcript.done` tells the server no more audio will be sent and to flush the remaining transcript and close the websocket.
+
+### Multichannel Streaming
+
+When `multichannel=true` and `channels` ≥ 2, the server transcribes each audio channel independently. Send interleaved multichannel PCM (e.g. L,R,L,R,… for stereo) as binary frames, and the server de-interleaves and processes each channel in parallel.
+
+**How it works:**
+
+* `transcript.created` is sent once (session-level — no `channel_index`).
+* `transcript.partial` events include a `channel_index` field (0-based) identifying the source channel. Events from different channels arrive interleaved.
+* `transcript.done` is sent **once per channel** after `audio.done`, each with its own `channel_index`.
+* Chunk sizes should account for all channels — e.g. for stereo PCM16 at 16 kHz, 100 ms = 6,400 bytes (3,200 per channel × 2 channels).
+
+**Example URL:**
+
+```
+wss://api.x.ai/v1/stt?sample_rate=16000&encoding=pcm&multichannel=true&channels=2&interim_results=true
 ```
 
-| Event | Description |
-|-------|-------------|
-| `audio.delta` | A chunk of base64-encoded audio in the codec specified at connection time. Decode and enqueue for playback. |
-| `audio.done` | All audio for the current utterance has been sent. Includes a `trace_id` for debugging. |
-| `error` | An error occurred. The `message` field contains a human-readable description. |
+**Typical use case:** Call center recordings with agent on channel 0 and customer on channel 1, enabling per-speaker transcription without requiring speaker diarization.
 
-### Multi-Utterance Sessions
-
-The connection stays open after `audio.done`. You can immediately send another round of `text.delta` → `text.done` messages to synthesize additional text without reconnecting. This is useful for conversational UIs where you generate audio for each assistant response in sequence.
-
-**Flow for multi-turn sessions:**
-
-1. **Turn 1:** Client sends `text.delta` → `text.done`
-2. Server responds with `audio.delta` chunks → `audio.done`
-3. Connection stays open
-4. **Turn 2:** Client sends `text.delta` → `text.done`
-5. Server responds with `audio.delta` chunks → `audio.done`
-6. Repeat as needed
-
-Each `text.done` flushes the accumulated text to generate audio. Once you receive `audio.done`, you can send more text for the next turn. The audio from each turn is independent — content from turn 1 does not bleed into turn 2.
+### Full Example
 
 ```python customLanguage="pythonWithoutSDK"
 import asyncio
-import base64
 import json
 import os
 
-import websockets  # pip install websockets
+import websockets
 
-XAI_API_KEY = os.environ["XAI_API_KEY"]
+API_KEY = os.environ["XAI_API_KEY"]
+WS_URL = "wss://api.x.ai/v1/stt?sample_rate=16000&encoding=pcm&interim_results=true&language=en&keyterm=Understand+The+Universe"
 
-async def multi_turn_tts(language: str = "en", voice: str = "eve", codec: str = "mp3"):
-    uri = f"wss://api.x.ai/v1/tts?language={language}&voice={voice}&codec={codec}"
+async def transcribe_stream(audio_file: str):
+    headers = {"Authorization": f"Bearer {API_KEY}"}
 
-    async with websockets.connect(
-        uri,
-        additional_headers={"Authorization": f"Bearer {XAI_API_KEY}"},
-    ) as ws:
-        # Turn 1
-        await ws.send(json.dumps({"type": "text.delta", "delta": "Hello from turn one."}))
-        await ws.send(json.dumps({"type": "text.done"}))
+    async with websockets.connect(WS_URL, additional_headers=headers) as ws:
+        # Wait for server ready signal
+        msg = json.loads(await ws.recv())
+        assert msg["type"] == "transcript.created"
+        print("Server ready")
 
-        turn1_audio = bytearray()
-        async for msg in ws:
-            event = json.loads(msg)
-            if event["type"] == "audio.delta":
-                turn1_audio.extend(base64.b64decode(event["delta"]))
-            elif event["type"] == "audio.done":
-                print(f"Turn 1: {len(turn1_audio):,} bytes")
+        # Read raw PCM from a WAV file (skip 44-byte header)
+        with open(audio_file, "rb") as f:
+            f.read(44)  # Skip WAV header
+            chunk_size = 16000 * 2 // 10  # 100ms of PCM16 at 16kHz
+
+            while chunk := f.read(chunk_size):
+                await ws.send(chunk)  # Send raw binary — no base64
+                await asyncio.sleep(0.1)
+
+        # Signal end of audio
+        await ws.send(json.dumps({"type": "audio.done"}))
+
+        # Collect events until transcript.done
+        async for message in ws:
+            event = json.loads(message)
+            if event["type"] == "transcript.partial":
+                prefix = "FINAL" if event["is_final"] else "partial"
+                print(f"[{prefix}] {event['text']}")
+            elif event["type"] == "transcript.done":
+                print(f"\nFull transcript: {event['text']}")
+                print(f"Duration: {event['duration']}s")
                 break
-            elif event["type"] == "error":
-                raise RuntimeError(event["message"])
 
-        # Connection is still open — send turn 2
-        await ws.send(json.dumps({"type": "text.delta", "delta": "And hello from turn two."}))
-        await ws.send(json.dumps({"type": "text.done"}))
-
-        turn2_audio = bytearray()
-        async for msg in ws:
-            event = json.loads(msg)
-            if event["type"] == "audio.delta":
-                turn2_audio.extend(base64.b64decode(event["delta"]))
-            elif event["type"] == "audio.done":
-                print(f"Turn 2: {len(turn2_audio):,} bytes")
-                break
-            elif event["type"] == "error":
-                raise RuntimeError(event["message"])
-
-asyncio.run(multi_turn_tts())
+asyncio.run(transcribe_stream("audio.wav"))
 ```
 
 ```javascript customLanguage="javascriptWithoutSDK"
-// npm install ws
-// Node.js 22+ has a built-in WebSocket global — you can skip
-// the "ws" package and remove this import if you're on v22+.
+import fs from "fs";
 import WebSocket from "ws";
 
 const apiKey = process.env.XAI_API_KEY;
-const language = "en";
-const voice = "eve";
-const codec = "mp3";
-const uri = `wss://api.x.ai/v1/tts?language=${language}&voice=${voice}&codec=${codec}`;
+const url = "wss://api.x.ai/v1/stt?sample_rate=16000&encoding=pcm&interim_results=true&language=en&keyterm=Understand+The+Universe";
 
-const ws = new WebSocket(uri, {
-  headers: { Authorization: `Bearer ${apiKey}` },
-});
+const ws = new WebSocket(url, { headers: { Authorization: `Bearer ${apiKey}` } });
 
-let turn = 1;
-let audioChunks = [];
-
-ws.on("open", () => {
-  // Start turn 1
-  ws.send(JSON.stringify({ type: "text.delta", delta: "Hello from turn one." }));
-  ws.send(JSON.stringify({ type: "text.done" }));
-});
+ws.on("open", () => console.log("Connected"));
 
 ws.on("message", (data) => {
   const event = JSON.parse(data);
-
-  if (event.type === "audio.delta") {
-    audioChunks.push(Buffer.from(event.delta, "base64"));
-  } else if (event.type === "audio.done") {
-    const audio = Buffer.concat(audioChunks);
-    console.log(`Turn ${turn}: ${audio.length.toLocaleString()} bytes`);
-    audioChunks = [];
-
-    if (turn === 1) {
-      // Connection still open — send turn 2
-      turn = 2;
-      ws.send(JSON.stringify({ type: "text.delta", delta: "And hello from turn two." }));
-      ws.send(JSON.stringify({ type: "text.done" }));
-    } else {
+  switch (event.type) {
+    case "transcript.created":
+      console.log("Server ready — streaming audio...");
+      // Read WAV file, skip 44-byte header, send 100ms chunks
+      const audio = fs.readFileSync("audio.wav").slice(44);
+      const chunkSize = 3200; // 100ms at 16kHz, 16-bit
+      let offset = 0;
+      const interval = setInterval(() => {
+        if (offset >= audio.length) {
+          clearInterval(interval);
+          ws.send(JSON.stringify({ type: "audio.done" }));
+          return;
+        }
+        ws.send(audio.slice(offset, offset + chunkSize));
+        offset += chunkSize;
+      }, 100);
+      break;
+    case "transcript.partial":
+      const prefix = event.is_final ? "FINAL" : "partial";
+      console.log(`[${prefix}] ${event.text}`);
+      break;
+    case "transcript.done":
+      console.log(`\nFull transcript: ${event.text}`);
+      console.log(`Duration: ${event.duration}s`);
       ws.close();
-    }
-  } else if (event.type === "error") {
-    console.error("Error:", event.message);
-    ws.close();
+      break;
   }
 });
 ```
 
-```swift
-import Foundation
+### Use Cases
 
-let apiKey = ProcessInfo.processInfo.environment["XAI_API_KEY"]!
-let language = "en"
-let voice = "eve"
-let codec = "mp3"
-let url = URL(string: "wss://api.x.ai/v1/tts?language=\(language)&voice=\(voice)&codec=\(codec)")!
+* **Live captions** — Real-time subtitles for video calls, meetings, and live streams
+* **Voice assistants** — Transcribe user speech for natural language understanding pipelines
+* **Call centers** — Real-time agent assistance with multichannel per-speaker transcription
+* **Accessibility** — Live transcription for hearing-impaired users
+* **Voice commands** — Low-latency speech-to-action for hands-free interfaces
 
-var request = URLRequest(url: url)
-request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+### Tips for Streaming STT
 
-let task = URLSession.shared.webSocketTask(with: request)
-task.resume()
+* **Use 16 kHz sample rate with PCM encoding** (`sample_rate=16000&encoding=pcm`) — this is the model's native rate and avoids resampling on the server
+* **Enable `interim_results`** for responsive UX — show transcription as the user speaks
+* **Use `language=en`** to enable text formatting — numbers and currencies are written in their standard form
+* **Send 100 ms audio chunks** (3,200 bytes at 16 kHz PCM16) for a good balance of latency and efficiency
+* **Wait for `transcript.created`** before sending audio — the server needs to initialize its ASR backend
 
-// Turn 1
-try await task.send(.string("{\"type\":\"text.delta\",\"delta\":\"Hello from turn one.\"}"))
-try await task.send(.string("{\"type\":\"text.done\"}"))
+## Error Handling
 
-var turn1Audio = Data()
-while true {
-    let message = try await task.receive()
-    guard case .string(let text) = message,
-          let json = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
-          let type = json["type"] as? String else { continue }
-
-    if type == "audio.delta", let delta = json["delta"] as? String,
-       let chunk = Data(base64Encoded: delta) {
-        turn1Audio.append(chunk)
-    } else if type == "audio.done" {
-        print("Turn 1: \(turn1Audio.count) bytes")
-        break
-    } else if type == "error" {
-        print("Error: \(json["message"] ?? "unknown")")
-        break
-    }
-}
-
-// Connection still open — send turn 2
-try await task.send(.string("{\"type\":\"text.delta\",\"delta\":\"And hello from turn two.\"}"))
-try await task.send(.string("{\"type\":\"text.done\"}"))
-
-var turn2Audio = Data()
-while true {
-    let message = try await task.receive()
-    guard case .string(let text) = message,
-          let json = try? JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any],
-          let type = json["type"] as? String else { continue }
-
-    if type == "audio.delta", let delta = json["delta"] as? String,
-       let chunk = Data(base64Encoded: delta) {
-        turn2Audio.append(chunk)
-    } else if type == "audio.done" {
-        print("Turn 2: \(turn2Audio.count) bytes")
-        break
-    } else if type == "error" {
-        print("Error: \(json["message"] ?? "unknown")")
-        break
-    }
-}
-
-task.cancel(with: .normalClosure, reason: nil)
-```
-
-### Limits and Behavior
-
-| Property | Value |
-|----------|-------|
-| **Total text length** | No limit — send as many `text.delta` messages as needed |
-| **Delta size** | Individual `text.delta` messages capped at 15,000 characters |
-| **Concurrent sessions** | 50 per team |
-| **Session permit TTL** | 600 seconds |
-| **Moderation** | Runs asynchronously on accumulated text after audio is sent (fail-open) |
-| **Billing** | Recorded per session based on total input characters |
+| Status | Meaning | Action |
+|--------|---------|--------|
+| `200` | Success | Transcription in the response body |
+| `400` | Bad request | Missing `file`/`url`, unsupported format, missing `sample_rate` for raw audio, `format=true` without `language` |
+| `401` | Unauthorized | API key is missing or invalid |
+| `413` | Payload too large | File exceeds 500 MB |
+| `429` | Rate limited | Back off and retry with exponential delay |
+| `502` | Bad gateway | URL download failed (when using `url`) |
+| `503` | Service unavailable | Backend not available — retry |
 
 ## Related
 
-* [TTS Playground](https://console.x.ai/team/default/voice/text-to-speech?campaign=voice-docs-tts) - Try voices and speech tags in your browser
-* [Create an API Key](https://console.x.ai/team/default/api-keys?campaign=voice-docs-tts) - Get started with the API
-* [Voice Overview](/developers/model-capabilities/audio/voice) - Overview of all xAI voice capabilities
-* [Voice Agent API](/developers/model-capabilities/audio/voice-agent) - Real-time voice conversations via WebSocket
-* [API Reference](/developers/rest-api-reference/inference/voice#text-to-speech---rest) - Full TTS endpoint specification
-* [List Voices](/developers/rest-api-reference/inference/voice#text-to-speech---list-voices) - Programmatically discover available voices
+* [Voice Overview](/developers/model-capabilities/audio/voice) — Overview of all xAI voice capabilities
+* [Text to Speech](/developers/model-capabilities/audio/text-to-speech) — Convert text to speech
+* [API Reference — Speech to text](/developers/rest-api-reference/inference/voice#speech-to-text---rest) — Full REST endpoint specification
+* [API Reference — Streaming](/developers/rest-api-reference/inference/voice#speech-to-text---streaming) — WebSocket streaming specification
