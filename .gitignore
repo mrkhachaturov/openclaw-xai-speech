@@ -2,3 +2,10 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# xAI API reference dumps — used to write the code, logic lives in src/
+docs/Synchronous.md
+docs/advance.md
+docs/code-execution.md
+docs/function.md
+docs/tool-calls.md
